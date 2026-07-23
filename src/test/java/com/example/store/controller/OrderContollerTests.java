@@ -79,7 +79,7 @@ class OrderControllerTests {
         request.setCustomerId(1L);
         request.setProductIds(List.of(1L));
 
-        mockMvc.perform(post("/order")
+        mockMvc.perform(post("/v1/order")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -98,7 +98,7 @@ class OrderControllerTests {
         request.setCustomerId(99L);
         request.setProductIds(List.of());
 
-        mockMvc.perform(post("/order")
+        mockMvc.perform(post("/v1/order")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -109,7 +109,7 @@ class OrderControllerTests {
         Page<Order> page = new PageImpl<>(List.of(order));
         when(orderService.getOrders(any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/order"))
+        mockMvc.perform(get("/v1/order"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].description").value("Test Order"))
                 .andExpect(jsonPath("$.content[0].customer.name").value("John Doe"))
@@ -120,7 +120,7 @@ class OrderControllerTests {
     void testGetOrderById() throws Exception {
         when(orderService.getOrderById(1L)).thenReturn(order);
 
-        mockMvc.perform(get("/order/1"))
+        mockMvc.perform(get("/v1/order/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("Test Order"))
                 .andExpect(jsonPath("$.customer.name").value("John Doe"));
@@ -130,6 +130,6 @@ class OrderControllerTests {
     void testGetOrderByIdNotFound() throws Exception {
         when(orderService.getOrderById(99L)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        mockMvc.perform(get("/order/99")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/v1/order/99")).andExpect(status().isNotFound());
     }
 }

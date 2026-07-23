@@ -65,7 +65,7 @@ class ProductControllerTests {
         CreateProductRequest request = new CreateProductRequest();
         request.setDescription("Widget");
 
-        mockMvc.perform(post("/products")
+        mockMvc.perform(post("/v1/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -78,7 +78,7 @@ class ProductControllerTests {
         Page<Product> page = new PageImpl<>(List.of(product));
         when(productService.getProducts(any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/products"))
+        mockMvc.perform(get("/v1/products"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].description").value("Widget"))
                 .andExpect(jsonPath("$.content[0].orders[0]").value(1));
@@ -88,7 +88,7 @@ class ProductControllerTests {
     void testGetProductById() throws Exception {
         when(productService.getProductById(1L)).thenReturn(product);
 
-        mockMvc.perform(get("/products/1"))
+        mockMvc.perform(get("/v1/products/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("Widget"))
                 .andExpect(jsonPath("$.orders[0]").value(1));
@@ -98,6 +98,6 @@ class ProductControllerTests {
     void testGetProductByIdNotFound() throws Exception {
         when(productService.getProductById(99L)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        mockMvc.perform(get("/products/99")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/v1/products/99")).andExpect(status().isNotFound());
     }
 }

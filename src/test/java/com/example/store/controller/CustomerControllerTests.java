@@ -58,7 +58,7 @@ class CustomerControllerTests {
         CreateCustomerRequest request = new CreateCustomerRequest();
         request.setName("John Doe");
 
-        mockMvc.perform(post("/customer")
+        mockMvc.perform(post("/v1/customer")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -70,7 +70,7 @@ class CustomerControllerTests {
         Page<Customer> page = new PageImpl<>(List.of(customer));
         when(customerService.getCustomers(isNull(), any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/customer"))
+        mockMvc.perform(get("/v1/customer"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("John Doe"))
                 .andExpect(jsonPath("$.page.totalElements").value(1));
@@ -81,7 +81,7 @@ class CustomerControllerTests {
         Page<Customer> page = new PageImpl<>(List.of(customer));
         when(customerService.getCustomers(eq("oh"), any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/customer").param("query", "oh"))
+        mockMvc.perform(get("/v1/customer").param("query", "oh"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("John Doe"));
     }
@@ -91,7 +91,7 @@ class CustomerControllerTests {
         Page<Customer> page = new PageImpl<>(List.of());
         when(customerService.getCustomers(eq("zzz"), any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/customer").param("query", "zzz"))
+        mockMvc.perform(get("/v1/customer").param("query", "zzz"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content").isEmpty());

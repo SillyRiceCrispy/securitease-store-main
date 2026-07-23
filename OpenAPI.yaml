@@ -17,7 +17,7 @@ servers:
 security:
   - ApiKeyAuth: []
 paths:
-  /order:
+  /v1/order:
     get:
       summary: Get Orders
       tags:
@@ -73,7 +73,7 @@ paths:
                   items:
                     type: integer
                     format: int64
-  /order/{id}:
+  /v1/order/{id}:
     get:
       summary: Get Order by ID
       tags:
@@ -96,7 +96,7 @@ paths:
           schema:
             type: integer
             format: int64
-  /customer:
+  /v1/customer:
     get:
       summary: Get Customers
       tags:
@@ -148,7 +148,7 @@ paths:
               properties:
                 name:
                   type: string
-  /products:
+  /v1/products:
     get:
       summary: Get Products
       tags:
@@ -194,7 +194,7 @@ paths:
               properties:
                 description:
                   type: string
-  /products/{id}:
+  /v1/products/{id}:
     get:
       summary: Get Product by ID
       tags:
