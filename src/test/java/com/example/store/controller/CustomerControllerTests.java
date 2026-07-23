@@ -21,6 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static com.atlassian.oai.validator.mockmvc.OpenApiValidationMatchers.openApi;
+import static com.example.store.OpenApiContractSupport.validator;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -59,10 +61,12 @@ class CustomerControllerTests {
         request.setName("John Doe");
 
         mockMvc.perform(post("/v1/customer")
+                        .header("X-API-Key", "test-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name").value("John Doe"));
+                .andExpect(jsonPath("$.name").value("John Doe"))
+                .andExpect(openApi().isValid(validator()));
     }
 
     @Test
@@ -70,10 +74,11 @@ class CustomerControllerTests {
         Page<Customer> page = new PageImpl<>(List.of(customer));
         when(customerService.getCustomers(isNull(), any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/v1/customer"))
+        mockMvc.perform(get("/v1/customer").header("X-API-Key", "test-key"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("John Doe"))
-                .andExpect(jsonPath("$.page.totalElements").value(1));
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(openApi().isValid(validator()));
     }
 
     @Test
@@ -81,9 +86,10 @@ class CustomerControllerTests {
         Page<Customer> page = new PageImpl<>(List.of(customer));
         when(customerService.getCustomers(eq("oh"), any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/v1/customer").param("query", "oh"))
+        mockMvc.perform(get("/v1/customer").header("X-API-Key", "test-key").param("query", "oh"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].name").value("John Doe"));
+                .andExpect(jsonPath("$.content[0].name").value("John Doe"))
+                .andExpect(openApi().isValid(validator()));
     }
 
     @Test
@@ -91,9 +97,10 @@ class CustomerControllerTests {
         Page<Customer> page = new PageImpl<>(List.of());
         when(customerService.getCustomers(eq("zzz"), any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/v1/customer").param("query", "zzz"))
+        mockMvc.perform(get("/v1/customer").header("X-API-Key", "test-key").param("query", "zzz"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
-                .andExpect(jsonPath("$.content").isEmpty());
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(openApi().isValid(validator()));
     }
 }

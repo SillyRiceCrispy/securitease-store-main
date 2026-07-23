@@ -51,6 +51,10 @@ paths:
       responses:
         '201':
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
         '400':
           description: Bad Request - customer or product ID not found
         '409':
@@ -142,6 +146,10 @@ paths:
       responses:
         '201':
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
         '409':
           description: Conflict - a request with this Idempotency-Key is already in progress
         '503':
@@ -192,6 +200,10 @@ paths:
       responses:
         '201':
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
         '409':
           description: Conflict - a request with this Idempotency-Key is already in progress
         '503':
@@ -315,7 +327,7 @@ components:
             id:
               type: integer
               format: int64
-            description:
+            name:
               type: string
         products:
           type: array

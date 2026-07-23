@@ -64,6 +64,8 @@ Mapping is done via MapStruct interfaces in `mapper/` (`@Mapper(componentModel =
 
 **Persistence.** `spring.jpa.hibernate.ddl-auto` is `validate` — schema is owned by Liquibase (`db/changelog/db.changelog-master.yaml` → `db.changelog-1.yaml` → `schema.sql`, `db.changelog-2.yaml` → `data.sql`), not Hibernate auto-DDL. New schema changes belong in a new Liquibase changeset, not in entity annotations alone. `hibernate.default_batch_fetch_size` is set to 10 to batch lazy-association fetches; keep this in mind (and prefer batching/fetch-join fixes over flipping associations to `EAGER`) when addressing the "slow GET endpoints under high DB latency" task.
 
+`spring.datasource.{url,username,password}` follow the same locally-defaulted-but-overridable pattern as `app.security.api-key`: the committed defaults (`admin`/`admin` on `localhost:5433`) match the `docker run` command in the README/this file's Commands section, but every other environment should set `SPRING_DATASOURCE_URL`/`SPRING_DATASOURCE_USERNAME`/`SPRING_DATASOURCE_PASSWORD` rather than relying on the checked-in default.
+
 **Table naming quirk.** The `Order` entity maps to a quoted table name (`@Table(name = "\"order\"")`) because `order` is a reserved SQL keyword — required whenever writing raw SQL/Liquibase changesets against it.
 
 **API versioning.** All business endpoints live under `/v1` (`/v1/customer`, `/v1/order`, `/v1/products` — set via each controller's `@RequestMapping`, not a global `server.servlet.context-path`, so it doesn't also prefix `/actuator/**`). `/actuator/**` is deliberately unversioned — it's operational tooling, not part of the versioned business API contract. A breaking API change belongs in a new `/v2` set of controllers (or a version-specific subset), not a change to `/v1` in place.
@@ -83,5 +85,7 @@ Lombok `@Data` is used on entities/DTOs in place of hand-written getters/setters
 ## Testing
 
 Controller tests use `@WebMvcTest` (slice test, not full context) with `@MockitoBean` to stub the service layer, plus `@ComponentScan(basePackageClasses = ...)` to pull in the real MapStruct mapper bean rather than mocking it. Follow this pattern — mock the service, let the real mapper run — for new controller tests.
+
+Controller tests also carry `.andExpect(openApi().isValid(validator()))` (see `OpenApiContractSupport`, `swagger-request-validator-mockmvc`) on top of the usual `jsonPath` assertions — this validates the actual response against `OpenAPI.yaml` itself, not just the hand-written expectations in the test, so the spec can't silently drift from what the service actually returns. Add this to any new controller test that hits a documented endpoint. `X-API-Key` is included on requests even though `addFilters = false` disables enforcement, so the request is fully spec-compliant for validation purposes. The validator loads `OpenAPI.yaml` via a relative path from the project root, which Gradle's `test` task uses as its working directory by default.
 
 Service tests are plain JUnit + Mockito (no Spring context at all) with `@MockitoBean`-equivalent `@Mock` repositories injected via `@InjectMocks` (or constructed directly) — business rules and transactional orchestration should be verifiable without spinning up any Spring machinery.

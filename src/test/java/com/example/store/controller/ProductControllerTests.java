@@ -24,6 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+import static com.atlassian.oai.validator.mockmvc.OpenApiValidationMatchers.openApi;
+import static com.example.store.OpenApiContractSupport.validator;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -66,11 +68,13 @@ class ProductControllerTests {
         request.setDescription("Widget");
 
         mockMvc.perform(post("/v1/products")
+                        .header("X-API-Key", "test-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.description").value("Widget"))
-                .andExpect(jsonPath("$.orders[0]").value(1));
+                .andExpect(jsonPath("$.orders[0]").value(1))
+                .andExpect(openApi().isValid(validator()));
     }
 
     @Test
@@ -78,26 +82,30 @@ class ProductControllerTests {
         Page<Product> page = new PageImpl<>(List.of(product));
         when(productService.getProducts(any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/v1/products"))
+        mockMvc.perform(get("/v1/products").header("X-API-Key", "test-key"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].description").value("Widget"))
-                .andExpect(jsonPath("$.content[0].orders[0]").value(1));
+                .andExpect(jsonPath("$.content[0].orders[0]").value(1))
+                .andExpect(openApi().isValid(validator()));
     }
 
     @Test
     void testGetProductById() throws Exception {
         when(productService.getProductById(1L)).thenReturn(product);
 
-        mockMvc.perform(get("/v1/products/1"))
+        mockMvc.perform(get("/v1/products/1").header("X-API-Key", "test-key"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("Widget"))
-                .andExpect(jsonPath("$.orders[0]").value(1));
+                .andExpect(jsonPath("$.orders[0]").value(1))
+                .andExpect(openApi().isValid(validator()));
     }
 
     @Test
     void testGetProductByIdNotFound() throws Exception {
         when(productService.getProductById(99L)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        mockMvc.perform(get("/v1/products/99")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/v1/products/99").header("X-API-Key", "test-key"))
+                .andExpect(status().isNotFound())
+                .andExpect(openApi().isValid(validator()));
     }
 }

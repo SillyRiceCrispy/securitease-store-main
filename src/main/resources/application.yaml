@@ -1,8 +1,10 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/store
-    username: admin
-    password: admin
+    # Local-dev-only defaults (match the docker run command in CLAUDE.md/README). Override
+    # via the standard SPRING_DATASOURCE_* env vars in any other environment.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/store}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:admin}
     hikari:
       # Fail fast rather than hanging when the pool is exhausted or the DB is unreachable.
       connection-timeout: 5000
