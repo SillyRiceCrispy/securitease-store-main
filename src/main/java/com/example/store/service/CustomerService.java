@@ -20,10 +20,9 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public Page<Customer> getCustomers(String query, Pageable pageable) {
-        Page<Customer> page =
-                (query == null || query.isBlank())
-                        ? customerRepository.findAll(pageable)
-                        : customerRepository.findByNameContaining(query, pageable);
+        Page<Customer> page = (query == null || query.isBlank())
+                ? customerRepository.findAll(pageable)
+                : customerRepository.findByNameContaining(query, pageable);
 
         List<Long> ids = page.getContent().stream().map(Customer::getId).toList();
         List<Customer> withOrders = customerRepository.findAllWithOrdersByIdIn(ids);

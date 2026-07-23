@@ -25,8 +25,7 @@ public class CustomerController {
 
     @GetMapping
     public PagedModel<CustomerDTO> getAllCustomers(
-            @RequestParam(required = false) String query,
-            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
+            @RequestParam(required = false) String query, @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         Page<Customer> page = customerService.getCustomers(query, pageable);
         return new PagedModel<>(page.map(customerMapper::customerToCustomerDTO));
     }

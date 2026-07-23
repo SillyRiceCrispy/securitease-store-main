@@ -9,9 +9,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Reorders a separately fetch-joined list back into the order of a plain, paginated id page.
- * Needed because collection fetch joins can't be combined with LIMIT/OFFSET in the same query -
- * see the repository methods this is used alongside.
+ * Reorders a separately fetch-joined list back into the order of a plain, paginated id page. Needed because collection
+ * fetch joins can't be combined with LIMIT/OFFSET in the same query - see the repository methods this is used
+ * alongside.
  */
 final class PageSupport {
     private PageSupport() {}

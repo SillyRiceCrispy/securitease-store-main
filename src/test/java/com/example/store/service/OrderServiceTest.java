@@ -26,9 +26,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Business-rule tests for order creation - no Spring context, no MockMvc. This is the payoff of
- * moving orchestration/validation out of the controller: these rules are now verifiable in
- * isolation from the web layer.
+ * Business-rule tests for order creation - no Spring context, no MockMvc. This is the payoff of moving
+ * orchestration/validation out of the controller: these rules are now verifiable in isolation from the web layer.
  */
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {

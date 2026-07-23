@@ -20,6 +20,10 @@ repositories {
     mavenCentral()
 }
 
+springBoot {
+    buildInfo()
+}
+
 spotless {
     java {
         palantirJavaFormat('2.50.0')
@@ -34,6 +38,7 @@ spotless {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'org.liquibase:liquibase-core'
     compileOnly 'org.projectlombok:lombok'

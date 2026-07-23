@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [master, main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Check formatting
+        run: ./gradlew spotlessCheck --no-daemon
+
+      - name: Run tests
+        run: ./gradlew test --no-daemon
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: build/reports/tests/test
+          retention-days: 7
+
+  docker:
+    name: Build, smoke-test, and publish image
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.2
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: store
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U admin"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t store:${{ github.sha }} .
+
+      - name: Smoke test the image against a real database
+        run: |
+          docker run -d --name store-smoke --network host \
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/store \
+            -e SPRING_DATASOURCE_USERNAME=admin \
+            -e SPRING_DATASOURCE_PASSWORD=admin \
+            store:${{ github.sha }}
+
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+              echo "Service is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Service did not become healthy in time"
+          docker logs store-smoke
+          exit 1
+
+      - name: Show container logs
+        if: always()
+        run: docker logs store-smoke || true
+
+      - name: Clean up smoke test container
+        if: always()
+        run: docker rm -f store-smoke || true
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push image
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/store
+          docker tag store:${{ github.sha }} "$(echo $IMAGE | tr '[:upper:]' '[:lower:]'):${{ github.sha }}"
+          docker tag store:${{ github.sha }} "$(echo $IMAGE | tr '[:upper:]' '[:lower:]'):latest"
+          docker push "$(echo $IMAGE | tr '[:upper:]' '[:lower:]'):${{ github.sha }}"
+          docker push "$(echo $IMAGE | tr '[:upper:]' '[:lower:]'):latest"

@@ -1,0 +1,9 @@
+.git
+.gradle
+build
+bin
+.idea
+.vscode
+out
+utils/node_modules
+*.md

@@ -1,3 +1,8 @@
+# Normalize all text files to LF on checkout, regardless of the local core.autocrlf
+# setting - keeps Spotless (which reads the working tree directly) consistent with
+# what's actually committed, on any OS.
+* text=auto eol=lf
+
 /gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
