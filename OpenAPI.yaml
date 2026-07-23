@@ -1,0 +1,247 @@
+openapi: 3.0.0
+info:
+  title: store
+  version: '1.0'
+  description: A simple store
+  contact:
+    name: SecuritEase Dev
+    url: 'https://www.securitease.com'
+    email: internal@securitease.com
+  termsOfService: 'https://www.securitease.com'
+  license:
+    name: Apache 2.0
+    url: 'https://www.apache.org/licenses/LICENSE-2.0.htm'
+servers:
+  - url: 'http://localhost:8080'
+    description: dev
+paths:
+  /order:
+    get:
+      summary: Get Orders
+      tags:
+        - store
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+      operationId: getOrders
+      description: Get all orders
+    post:
+      summary: Create Order
+      tags:
+        - store
+      responses:
+        '201':
+          description: Created
+      operationId: createOrder
+      description: Create a new order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  format: int64
+                descriptioon:
+                  type: string
+  /order/{id}:
+    get:
+      summary: Get Order by ID
+      tags:
+        - store
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Not Found
+      operationId: getOrderById
+      description: Get a specific order by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+  /customer:
+    get:
+      summary: Get Customers
+      tags:
+        - store
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+      operationId: getCustomers
+      description: Get all customers, optionally filtered by a substring match against one of the words in their name
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Substring to match against a word in the customer's name
+    post:
+      summary: Create Customer
+      tags:
+        - store
+      responses:
+        '201':
+          description: Created
+      operationId: createCustomer
+      description: Create a new customer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  format: int64
+                name:
+                  type: string
+  /products:
+    get:
+      summary: Get Products
+      tags:
+        - store
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+      operationId: getProducts
+      description: Get all products
+    post:
+      summary: Create Product
+      tags:
+        - store
+      responses:
+        '201':
+          description: Created
+      operationId: createProduct
+      description: Create a new product
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  format: int64
+                description:
+                  type: string
+                  x-stoplight:
+                    id: jbh0jzkonppv8
+  /products/{id}:
+    get:
+      summary: Get Product by ID
+      tags:
+        - store
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Not Found
+      operationId: getProductById
+      description: Get a specific product by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+components:
+  schemas:
+    Order:
+      title: Order
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        description:
+          type: string
+        customer:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            description:
+              type: string
+        products:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                format: int64
+              description:
+                type: string
+    Product:
+      title: Product
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        description:
+          type: string
+        orders:
+          type: array
+          items:
+            type: integer
+            format: int64
+    Customer:
+      title: Customer
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        orders:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                format: int64
+              description:
+                type: string
+                x-stoplight:
+                  id: mq08x82g95zl9
+tags:
+  - name: store
+    description: store operations

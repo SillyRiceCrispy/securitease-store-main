@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: 4-sync-sequences
+      author: developer@securitease.com
+      changes:
+        - sqlFile:
+            path: db/changelog/sync-sequences.sql
