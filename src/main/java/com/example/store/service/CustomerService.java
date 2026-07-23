@@ -10,6 +10,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+
 import java.util.List;
 
 @Service
@@ -18,6 +21,8 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
 
+    @CircuitBreaker(name = "database")
+    @Retry(name = "database")
     @Transactional(readOnly = true)
     public Page<Customer> getCustomers(String query, Pageable pageable) {
         Page<Customer> page = (query == null || query.isBlank())
@@ -29,6 +34,7 @@ public class CustomerService {
         return PageSupport.reorder(page, Customer::getId, withOrders);
     }
 
+    @CircuitBreaker(name = "database")
     @Transactional
     public Customer createCustomer(String name) {
         Customer customer = new Customer();

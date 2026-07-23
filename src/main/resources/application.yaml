@@ -3,6 +3,11 @@ spring:
     url: jdbc:postgresql://localhost:5433/store
     username: admin
     password: admin
+    hikari:
+      # Fail fast rather than hanging when the pool is exhausted or the DB is unreachable.
+      connection-timeout: 5000
+      validation-timeout: 3000
+      maximum-pool-size: 10
   jpa:
     open-in-view: false
     hibernate:
@@ -47,3 +52,36 @@ app:
   security:
     # Local-dev-only default. Override via the API_KEY env var in any other environment.
     api-key: ${API_KEY:local-dev-only-change-me}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      database:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        # A 404/400 from a service method is a business outcome, not a DB failure -
+        # it shouldn't count toward tripping the circuit.
+        ignore-exceptions:
+          - org.springframework.web.server.ResponseStatusException
+  retry:
+    instances:
+      # Only applied to read methods (see CustomerService/OrderService/ProductService) -
+      # retrying a write automatically is unsafe if the connection drops after the write
+      # reaches Postgres but before the ack comes back, since a blind retry could insert
+      # a second row. Reads have no such risk.
+      database:
+        max-attempts: 3
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        # Both hierarchies show up in practice: a failed query is a DataAccessException,
+        # but failing to even open the transaction (e.g. no connection available) is a
+        # TransactionException - a sibling hierarchy, not a DataAccessException subtype.
+        retry-exceptions:
+          - org.springframework.dao.DataAccessException
+          - org.springframework.transaction.TransactionException
+        ignore-exceptions:
+          - org.springframework.web.server.ResponseStatusException

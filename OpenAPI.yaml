@@ -36,6 +36,8 @@ paths:
                       $ref: '#/components/schemas/Order'
                   page:
                     $ref: '#/components/schemas/PageMetadata'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       operationId: getOrders
       description: Get orders, paginated
       parameters:
@@ -53,6 +55,8 @@ paths:
           description: Bad Request - customer or product ID not found
         '409':
           description: Conflict - a request with this Idempotency-Key is already in progress
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       operationId: createOrder
       description: Create a new order
       parameters:
@@ -87,6 +91,8 @@ paths:
                 $ref: '#/components/schemas/Order'
         '404':
           description: Not Found
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       operationId: getOrderById
       description: Get a specific order by ID
       parameters:
@@ -115,6 +121,8 @@ paths:
                       $ref: '#/components/schemas/Customer'
                   page:
                     $ref: '#/components/schemas/PageMetadata'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       operationId: getCustomers
       description: Get customers, paginated, optionally filtered by a substring match against one of the words in their name
       parameters:
@@ -136,6 +144,8 @@ paths:
           description: Created
         '409':
           description: Conflict - a request with this Idempotency-Key is already in progress
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       operationId: createCustomer
       description: Create a new customer
       parameters:
@@ -167,6 +177,8 @@ paths:
                       $ref: '#/components/schemas/Product'
                   page:
                     $ref: '#/components/schemas/PageMetadata'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       operationId: getProducts
       description: Get products, paginated
       parameters:
@@ -182,6 +194,8 @@ paths:
           description: Created
         '409':
           description: Conflict - a request with this Idempotency-Key is already in progress
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       operationId: createProduct
       description: Create a new product
       parameters:
@@ -208,6 +222,8 @@ paths:
                 $ref: '#/components/schemas/Product'
         '404':
           description: Not Found
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       operationId: getProductById
       description: Get a specific product by ID
       parameters:
@@ -218,6 +234,20 @@ paths:
             type: integer
             format: int64
 components:
+  responses:
+    ServiceUnavailable:
+      description: >-
+        Service Unavailable - the database is unreachable (circuit open) or a query
+        failed after retries were exhausted
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

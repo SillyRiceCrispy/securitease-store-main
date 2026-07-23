@@ -16,6 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+
 import java.util.List;
 import java.util.Set;
 
@@ -27,6 +30,8 @@ public class OrderService {
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
 
+    @CircuitBreaker(name = "database")
+    @Retry(name = "database")
     @Transactional(readOnly = true)
     public Page<Order> getOrders(Pageable pageable) {
         Page<Order> page = orderRepository.findAll(pageable);
@@ -35,6 +40,8 @@ public class OrderService {
         return PageSupport.reorder(page, Order::getId, withDetails);
     }
 
+    @CircuitBreaker(name = "database")
+    @Retry(name = "database")
     @Transactional(readOnly = true)
     public Order getOrderById(Long id) {
         return orderRepository
@@ -42,6 +49,7 @@ public class OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
+    @CircuitBreaker(name = "database")
     @Transactional
     public Order createOrder(String description, Long customerId, List<Long> productIds) {
         if (customerId == null) {
