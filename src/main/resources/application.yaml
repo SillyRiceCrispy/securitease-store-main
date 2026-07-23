@@ -42,3 +42,8 @@ management:
   info:
     env:
       enabled: true
+
+app:
+  security:
+    # Local-dev-only default. Override via the API_KEY env var in any other environment.
+    api-key: ${API_KEY:local-dev-only-change-me}

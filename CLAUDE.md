@@ -66,6 +66,8 @@ Mapping is done via MapStruct interfaces in `mapper/` (`@Mapper(componentModel =
 
 **Table naming quirk.** The `Order` entity maps to a quoted table name (`@Table(name = "\"order\"")`) because `order` is a reserved SQL keyword — required whenever writing raw SQL/Liquibase changesets against it.
 
+**Security.** All endpoints require an `X-API-Key` header matching `app.security.api-key` (`API_KEY` env var; defaults to `local-dev-only-change-me` for local dev — see `application.yaml`), enforced by `ApiKeyAuthFilter` + `SecurityConfig` in `security/`. The one deliberate exception is `/actuator/health/**`, which stays open since container orchestrators and the CI smoke test poll it without sending credentials. `@WebMvcTest` controller tests disable the security filter chain via `@AutoConfigureMockMvc(addFilters = false)` since they test controller/mapping logic, not auth — auth itself is covered by `ApiKeyAuthFilterTest`. When manually hitting the API (curl, Postman, etc.), remember to pass the header.
+
 ## Code style
 
 Enforced via Spotless (`palantirJavaFormat`, PALANTIR style) — run `spotlessApply` before committing. Import order is fixed: `com`, `jakarta`, `lombok`, `org`, `` (blank/other), `javax|java`, then static imports (`\#`). Unused imports are stripped automatically; don't hand-tune import grouping.

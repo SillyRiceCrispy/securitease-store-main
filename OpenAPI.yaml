@@ -14,6 +14,8 @@ info:
 servers:
   - url: 'http://localhost:8080'
     description: dev
+security:
+  - ApiKeyAuth: []
 paths:
   /order:
     get:
@@ -204,6 +206,12 @@ paths:
             type: integer
             format: int64
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Required on every endpoint except /actuator/health/**
   parameters:
     page:
       name: page
