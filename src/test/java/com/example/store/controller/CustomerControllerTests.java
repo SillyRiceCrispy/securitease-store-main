@@ -3,7 +3,7 @@ package com.example.store.controller;
 import com.example.store.dto.CreateCustomerRequest;
 import com.example.store.entity.Customer;
 import com.example.store.mapper.CustomerMapper;
-import com.example.store.repository.CustomerRepository;
+import com.example.store.service.CustomerService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +22,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -37,7 +38,7 @@ class CustomerControllerTests {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private CustomerRepository customerRepository;
+    private CustomerService customerService;
 
     private Customer customer;
 
@@ -50,9 +51,7 @@ class CustomerControllerTests {
 
     @Test
     void testCreateCustomer() throws Exception {
-        Customer toSave = new Customer();
-        toSave.setName("John Doe");
-        when(customerRepository.save(toSave)).thenReturn(customer);
+        when(customerService.createCustomer("John Doe")).thenReturn(customer);
 
         CreateCustomerRequest request = new CreateCustomerRequest();
         request.setName("John Doe");
@@ -67,8 +66,7 @@ class CustomerControllerTests {
     @Test
     void testGetAllCustomers() throws Exception {
         Page<Customer> page = new PageImpl<>(List.of(customer));
-        when(customerRepository.findAll(any(Pageable.class))).thenReturn(page);
-        when(customerRepository.findAllWithOrdersByIdIn(List.of(1L))).thenReturn(List.of(customer));
+        when(customerService.getCustomers(isNull(), any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get("/customer"))
                 .andExpect(status().isOk())
@@ -79,8 +77,7 @@ class CustomerControllerTests {
     @Test
     void testSearchCustomersByNameSubstring() throws Exception {
         Page<Customer> page = new PageImpl<>(List.of(customer));
-        when(customerRepository.findByNameContaining(eq("oh"), any(Pageable.class))).thenReturn(page);
-        when(customerRepository.findAllWithOrdersByIdIn(List.of(1L))).thenReturn(List.of(customer));
+        when(customerService.getCustomers(eq("oh"), any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get("/customer").param("query", "oh"))
                 .andExpect(status().isOk())
@@ -90,8 +87,7 @@ class CustomerControllerTests {
     @Test
     void testSearchCustomersByNameSubstringNoMatch() throws Exception {
         Page<Customer> page = new PageImpl<>(List.of());
-        when(customerRepository.findByNameContaining(eq("zzz"), any(Pageable.class))).thenReturn(page);
-        when(customerRepository.findAllWithOrdersByIdIn(List.of())).thenReturn(List.of());
+        when(customerService.getCustomers(eq("zzz"), any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get("/customer").param("query", "zzz"))
                 .andExpect(status().isOk())

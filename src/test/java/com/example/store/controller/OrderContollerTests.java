@@ -5,9 +5,7 @@ import com.example.store.entity.Customer;
 import com.example.store.entity.Order;
 import com.example.store.entity.Product;
 import com.example.store.mapper.CustomerMapper;
-import com.example.store.repository.CustomerRepository;
-import com.example.store.repository.OrderRepository;
-import com.example.store.repository.ProductRepository;
+import com.example.store.service.OrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -20,14 +18,17 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -44,13 +45,7 @@ class OrderControllerTests {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private OrderRepository orderRepository;
-
-    @MockitoBean
-    private CustomerRepository customerRepository;
-
-    @MockitoBean
-    private ProductRepository productRepository;
+    private OrderService orderService;
 
     private Order order;
     private Customer customer;
@@ -75,12 +70,7 @@ class OrderControllerTests {
 
     @Test
     void testCreateOrder() throws Exception {
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(productRepository.findAllById(List.of(1L))).thenReturn(List.of(product));
-
-        Order toSave = new Order();
-        toSave.setDescription("Test Order");
-        when(orderRepository.save(toSave)).thenReturn(order);
+        when(orderService.createOrder("Test Order", 1L, List.of(1L))).thenReturn(order);
 
         CreateOrderRequest request = new CreateOrderRequest();
         request.setDescription("Test Order");
@@ -97,20 +87,9 @@ class OrderControllerTests {
     }
 
     @Test
-    void testCreateOrderMissingCustomerId() throws Exception {
-        CreateOrderRequest request = new CreateOrderRequest();
-        request.setDescription("Test Order");
-        request.setProductIds(List.of());
-
-        mockMvc.perform(post("/order")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void testCreateOrderCustomerNotFound() throws Exception {
-        when(customerRepository.findById(99L)).thenReturn(Optional.empty());
+    void testCreateOrderPropagatesServiceValidationFailure() throws Exception {
+        when(orderService.createOrder(anyString(), any(), anyList()))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Customer not found"));
 
         CreateOrderRequest request = new CreateOrderRequest();
         request.setDescription("Test Order");
@@ -124,26 +103,9 @@ class OrderControllerTests {
     }
 
     @Test
-    void testCreateOrderProductNotFound() throws Exception {
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(productRepository.findAllById(List.of(99L))).thenReturn(List.of());
-
-        CreateOrderRequest request = new CreateOrderRequest();
-        request.setDescription("Test Order");
-        request.setCustomerId(1L);
-        request.setProductIds(List.of(99L));
-
-        mockMvc.perform(post("/order")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
     void testGetOrder() throws Exception {
         Page<Order> page = new PageImpl<>(List.of(order));
-        when(orderRepository.findAll(any(Pageable.class))).thenReturn(page);
-        when(orderRepository.findAllWithCustomerAndProductsByIdIn(List.of(1L))).thenReturn(List.of(order));
+        when(orderService.getOrders(any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get("/order"))
                 .andExpect(status().isOk())
@@ -154,7 +116,7 @@ class OrderControllerTests {
 
     @Test
     void testGetOrderById() throws Exception {
-        when(orderRepository.findByIdWithCustomerAndProducts(1L)).thenReturn(Optional.of(order));
+        when(orderService.getOrderById(1L)).thenReturn(order);
 
         mockMvc.perform(get("/order/1"))
                 .andExpect(status().isOk())
@@ -164,7 +126,7 @@ class OrderControllerTests {
 
     @Test
     void testGetOrderByIdNotFound() throws Exception {
-        when(orderRepository.findByIdWithCustomerAndProducts(99L)).thenReturn(Optional.empty());
+        when(orderService.getOrderById(99L)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
 
         mockMvc.perform(get("/order/99")).andExpect(status().isNotFound());
     }

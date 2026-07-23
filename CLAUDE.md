@@ -54,8 +54,7 @@ If the Liquibase changelog itself changes, existing local databases need manual 
 
 ## Architecture
 
-**No service layer.** Controllers talk directly to Spring Data JPA repositories:
-`Controller → Repository (JpaRepository) → Entity`, with MapStruct mapping `Entity → DTO` at the controller boundary. When extending existing endpoints or adding new ones (e.g. `/products`), follow this same direct controller→repository pattern unless there's a specific reason to introduce a service layer.
+**Service layer.** `Controller → Service → Repository (JpaRepository) → Entity`, with MapStruct mapping `Entity → DTO` at the controller boundary (services operate on entities, not DTOs). Services own transaction boundaries (`@Transactional`) and business-rule validation (e.g. rejecting an order with an unknown customer/product id); controllers only translate HTTP in/out and shouldn't call repositories directly. When extending existing endpoints or adding new ones, follow this same controller→service→repository pattern.
 
 **DTO pairing breaks entity cycles.** `Customer` and `Order` reference each other (`Customer.orders` / `Order.customer`), so serializing an entity graph directly would loop. Each entity has two DTOs:
 - A "full" outer DTO returned from an endpoint (`CustomerDTO`, `OrderDTO`) that embeds the *other* side as a truncated form.
@@ -75,4 +74,6 @@ Lombok `@Data` is used on entities/DTOs in place of hand-written getters/setters
 
 ## Testing
 
-Controller tests use `@WebMvcTest` (slice test, not full context) with `@MockitoBean` to stub repositories, plus `@ComponentScan(basePackageClasses = ...)` to pull in the real MapStruct mapper bean rather than mocking it. Follow this pattern — mock the repository layer, let the real mapper run — for new controller tests.
+Controller tests use `@WebMvcTest` (slice test, not full context) with `@MockitoBean` to stub the service layer, plus `@ComponentScan(basePackageClasses = ...)` to pull in the real MapStruct mapper bean rather than mocking it. Follow this pattern — mock the service, let the real mapper run — for new controller tests.
+
+Service tests are plain JUnit + Mockito (no Spring context at all) with `@MockitoBean`-equivalent `@Mock` repositories injected via `@InjectMocks` (or constructed directly) — business rules and transactional orchestration should be verifiable without spinning up any Spring machinery.

@@ -4,7 +4,7 @@ import com.example.store.dto.CreateProductRequest;
 import com.example.store.entity.Order;
 import com.example.store.entity.Product;
 import com.example.store.mapper.ProductMapper;
-import com.example.store.repository.ProductRepository;
+import com.example.store.service.ProductService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -15,12 +15,13 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -38,7 +39,7 @@ class ProductControllerTests {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private ProductRepository productRepository;
+    private ProductService productService;
 
     private Product product;
     private Order order;
@@ -57,9 +58,7 @@ class ProductControllerTests {
 
     @Test
     void testCreateProduct() throws Exception {
-        Product toSave = new Product();
-        toSave.setDescription("Widget");
-        when(productRepository.save(toSave)).thenReturn(product);
+        when(productService.createProduct("Widget")).thenReturn(product);
 
         CreateProductRequest request = new CreateProductRequest();
         request.setDescription("Widget");
@@ -75,8 +74,7 @@ class ProductControllerTests {
     @Test
     void testGetAllProducts() throws Exception {
         Page<Product> page = new PageImpl<>(List.of(product));
-        when(productRepository.findAll(any(Pageable.class))).thenReturn(page);
-        when(productRepository.findAllWithOrdersByIdIn(List.of(1L))).thenReturn(List.of(product));
+        when(productService.getProducts(any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get("/products"))
                 .andExpect(status().isOk())
@@ -86,7 +84,7 @@ class ProductControllerTests {
 
     @Test
     void testGetProductById() throws Exception {
-        when(productRepository.findByIdWithOrders(1L)).thenReturn(Optional.of(product));
+        when(productService.getProductById(1L)).thenReturn(product);
 
         mockMvc.perform(get("/products/1"))
                 .andExpect(status().isOk())
@@ -96,7 +94,7 @@ class ProductControllerTests {
 
     @Test
     void testGetProductByIdNotFound() throws Exception {
-        when(productRepository.findByIdWithOrders(99L)).thenReturn(Optional.empty());
+        when(productService.getProductById(99L)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
 
         mockMvc.perform(get("/products/99")).andExpect(status().isNotFound());
     }
