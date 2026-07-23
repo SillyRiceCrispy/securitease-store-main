@@ -26,6 +26,10 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /workspace/build/libs/*.jar app.jar
 
+# Structured (JSON) logs by default in a container - the human-readable console pattern is
+# for local `bootRun` only. Override with an empty value to get plain text instead.
+ENV LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs
+
 USER spring:spring
 EXPOSE 8080
 

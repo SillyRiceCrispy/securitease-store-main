@@ -55,6 +55,18 @@ app:
     # Local-dev-only default. Override via the API_KEY env var in any other environment.
     api-key: ${API_KEY:local-dev-only-change-me}
 
+logging:
+  pattern:
+    # Include the correlation id (RequestIdFilter) in the plain-text local dev console too -
+    # structured formats (see below) pick up MDC content automatically, no pattern needed.
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [%X{requestId}] %logger{36} - %msg%n'
+  structured:
+    format:
+      # Unset by default so local `bootRun` stays human-readable. Set to ecs/logstash/gelf
+      # (e.g. via LOGGING_STRUCTURED_FORMAT_CONSOLE) for any environment where logs are
+      # consumed by an aggregator rather than a human terminal - see the Dockerfile.
+      console: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:}
+
 resilience4j:
   circuitbreaker:
     instances:

@@ -1,18 +1,26 @@
 package com.example.store.idempotency;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -25,14 +33,17 @@ import java.util.Optional;
  * SecurityContext this filter must run after in the chain) - no point spending a DB round trip on a request that's
  * going to be rejected anyway.
  */
+@Slf4j
 public class IdempotencyFilter extends OncePerRequestFilter {
 
     static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
     private final IdempotencyRecordRepository idempotencyRecordRepository;
+    private final ObjectMapper objectMapper;
 
-    public IdempotencyFilter(IdempotencyRecordRepository idempotencyRecordRepository) {
+    public IdempotencyFilter(IdempotencyRecordRepository idempotencyRecordRepository, ObjectMapper objectMapper) {
         this.idempotencyRecordRepository = idempotencyRecordRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -54,7 +65,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         Optional<IdempotencyRecord> existing =
                 idempotencyRecordRepository.findByIdempotencyKeyAndRequestPath(key, path);
         if (existing.isPresent()) {
-            replayOrReject(existing.get(), response);
+            replayOrReject(existing.get(), request, response);
             return;
         }
 
@@ -65,7 +76,8 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             idempotencyRecordRepository.saveAndFlush(placeholder);
         } catch (DataIntegrityViolationException e) {
             // Lost the race to a concurrent request using the same key.
-            writeConflict(response);
+            log.warn("Idempotency key conflict (concurrent request) for {} {}", request.getMethod(), path);
+            writeConflict(request, response);
             return;
         }
 
@@ -76,6 +88,11 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             int status = wrappedResponse.getStatus();
             if (status >= 500) {
                 // Transient failure - don't lock the client out of retrying with the same key.
+                log.warn(
+                        "Not caching idempotency key for {} {} - request failed with {}",
+                        request.getMethod(),
+                        path,
+                        status);
                 idempotencyRecordRepository.delete(placeholder);
             } else {
                 placeholder.setResponseStatus(status);
@@ -87,21 +104,27 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         }
     }
 
-    private void replayOrReject(IdempotencyRecord record, HttpServletResponse response) throws IOException {
+    private void replayOrReject(IdempotencyRecord record, HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
         if (record.getResponseStatus() == null) {
-            writeConflict(response);
+            log.warn("Idempotency key still in progress for {} {}", request.getMethod(), request.getRequestURI());
+            writeConflict(request, response);
             return;
         }
+        log.info(
+                "Replaying cached response for idempotency key on {} {}", request.getMethod(), request.getRequestURI());
         response.setStatus(record.getResponseStatus());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write(record.getResponseBody());
     }
 
-    private void writeConflict(HttpServletResponse response) throws IOException {
-        response.setStatus(HttpServletResponse.SC_CONFLICT);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter()
-                .write(
-                        "{\"error\":\"Conflict\",\"message\":\"A request with this Idempotency-Key is already in progress or was already used\"}");
+    private void writeConflict(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, "A request with this Idempotency-Key is already in progress or was already used");
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty("timestamp", Instant.now());
+        response.setStatus(HttpStatus.CONFLICT.value());
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(), problem);
     }
 }

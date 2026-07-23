@@ -1,5 +1,8 @@
 package com.example.store.idempotency;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import jakarta.servlet.FilterChain;
 
 import org.junit.jupiter.api.AfterEach;
@@ -7,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -29,6 +33,12 @@ class IdempotencyFilterTest {
 
     @Mock
     private IdempotencyRecordRepository repository;
+
+    // Mirrors what Spring Boot's auto-configured ObjectMapper actually registers (via
+    // spring-boot-starter-json) - a bare `new ObjectMapper()` can't serialize the Instant
+    // timestamp ProblemDetail extension property without this.
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @InjectMocks
     private IdempotencyFilter filter;
@@ -121,6 +131,8 @@ class IdempotencyFilterTest {
 
         verify(chain, never()).doFilter(any(), any());
         assertThat(response.getStatus()).isEqualTo(409);
+        assertThat(response.getContentType()).isEqualTo("application/problem+json");
+        assertThat(response.getContentAsString()).contains("\"status\":409").contains("already in progress");
     }
 
     @Test
