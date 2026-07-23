@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: 5-idempotency-schema
+      author: developer@securitease.com
+      changes:
+        - sqlFile:
+            path: db/changelog/idempotency-schema.sql

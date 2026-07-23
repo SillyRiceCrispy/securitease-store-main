@@ -1,6 +1,11 @@
 package com.example.store.security;
 
+import com.example.store.idempotency.IdempotencyFilter;
+import com.example.store.idempotency.IdempotencyRecordRepository;
+
 import jakarta.servlet.http.HttpServletResponse;
+
+import lombok.RequiredArgsConstructor;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -13,13 +18,17 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
+@RequiredArgsConstructor
 public class SecurityConfig {
 
     @Value("${app.security.api-key}")
     private String apiKey;
 
+    private final IdempotencyRecordRepository idempotencyRecordRepository;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        ApiKeyAuthFilter apiKeyAuthFilter = new ApiKeyAuthFilter(apiKey);
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -31,7 +40,11 @@ public class SecurityConfig {
                         .permitAll()
                         .anyRequest()
                         .authenticated())
-                .addFilterBefore(new ApiKeyAuthFilter(apiKey), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // Runs after API-key auth so it can see whether the request is authenticated,
+                // and only spends a DB round trip on requests that are actually going to reach
+                // a controller.
+                .addFilterAfter(new IdempotencyFilter(idempotencyRecordRepository), ApiKeyAuthFilter.class)
                 .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) -> {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);

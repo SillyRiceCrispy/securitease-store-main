@@ -51,8 +51,12 @@ paths:
           description: Created
         '400':
           description: Bad Request - customer or product ID not found
+        '409':
+          description: Conflict - a request with this Idempotency-Key is already in progress
       operationId: createOrder
       description: Create a new order
+      parameters:
+        - $ref: '#/components/parameters/idempotencyKey'
       requestBody:
         content:
           application/json:
@@ -130,8 +134,12 @@ paths:
       responses:
         '201':
           description: Created
+        '409':
+          description: Conflict - a request with this Idempotency-Key is already in progress
       operationId: createCustomer
       description: Create a new customer
+      parameters:
+        - $ref: '#/components/parameters/idempotencyKey'
       requestBody:
         content:
           application/json:
@@ -172,8 +180,12 @@ paths:
       responses:
         '201':
           description: Created
+        '409':
+          description: Conflict - a request with this Idempotency-Key is already in progress
       operationId: createProduct
       description: Create a new product
+      parameters:
+        - $ref: '#/components/parameters/idempotencyKey'
       requestBody:
         content:
           application/json:
@@ -236,6 +248,15 @@ components:
       schema:
         type: string
       description: 'Sort order, e.g. "id,desc"'
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: >-
+        Optional. A retry with the same key on this path replays the original response
+        instead of repeating the write. Omit for normal (non-idempotent) behavior.
   schemas:
     PageMetadata:
       type: object
