@@ -4,6 +4,7 @@ spring:
     username: admin
     password: admin
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:
@@ -11,5 +12,14 @@ spring:
         format_sql: true
         use_sql_comments: true
         default_batch_fetch_size: 10
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100

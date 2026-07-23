@@ -15,8 +15,6 @@ public interface ProductMapper {
     @Mapping(target = "orders", source = "orders", qualifiedByName = "ordersToOrderIds")
     ProductDTO productToProductDTO(Product product);
 
-    List<ProductDTO> productsToProductDTOs(List<Product> products);
-
     @Named("ordersToOrderIds")
     default List<Long> ordersToOrderIds(List<Order> orders) {
         return orders.stream().map(Order::getId).toList();
