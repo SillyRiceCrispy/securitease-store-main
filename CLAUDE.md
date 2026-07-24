@@ -20,7 +20,7 @@ These describe the intended scope of work in this repo — check current code ag
 
 ## Commands
 
-Requires PostgreSQL 16.2 reachable at `localhost:5433` (non-standard port), database `store`, user/pass `admin:admin`:
+`./gradlew bootRun` requires PostgreSQL 16.2 reachable at `localhost:5433` (non-standard port), database `store`, user/pass `admin:admin`:
 
 ```shell
 docker run -d --name postgres --restart always \
@@ -28,6 +28,8 @@ docker run -d --name postgres --restart always \
   -v postgres:/var/lib/postgresql/data -p 5433:5432 \
   postgres:16.2 postgres -c wal_level=logical
 ```
+
+`./gradlew test` does not need that container — repository/integration tests manage their own Postgres 16.2 via Testcontainers (see Testing) — but it does need a working Docker Engine (not just the `docker` CLI; see the Testcontainers note under Testing for a Windows/Docker Desktop gotcha).
 
 On Windows use `gradlew.bat` in place of `./gradlew`.
 
@@ -95,3 +97,9 @@ Controller tests use `@WebMvcTest` (slice test, not full context) with `@Mockito
 Controller tests also carry `.andExpect(openApi().isValid(validator()))` (see `OpenApiContractSupport`, `swagger-request-validator-mockmvc`) on top of the usual `jsonPath` assertions — this validates the actual response against `OpenAPI.yaml` itself, not just the hand-written expectations in the test, so the spec can't silently drift from what the service actually returns. Add this to any new controller test that hits a documented endpoint. `X-API-Key` is included on requests even though `addFilters = false` disables enforcement, so the request is fully spec-compliant for validation purposes. The validator loads `OpenAPI.yaml` via a relative path from the project root, which Gradle's `test` task uses as its working directory by default.
 
 Service tests are plain JUnit + Mockito (no Spring context at all) with `@MockitoBean`-equivalent `@Mock` repositories injected via `@InjectMocks` (or constructed directly) — business rules and transactional orchestration should be verifiable without spinning up any Spring machinery.
+
+Repository tests (`repository/*RepositoryTest`) use `@DataJpaTest` against a real Postgres 16.2 container via Testcontainers (`AbstractRepositoryTest`'s static, `@ServiceConnection`-annotated container, shared across all three repository test classes) with `@AutoConfigureTestDatabase(replace = Replace.NONE)` so Spring doesn't substitute an embedded database — the hand-written `JOIN FETCH` JPQL and the `"order"` reserved-keyword table mapping aren't guaranteed to behave the same against H2. Liquibase runs its full changelog (schema + ~10k rows of bulk sample data + sequence sync) against the container on context startup, same as any other fresh database. To prove a fetch-join query actually eager-loads its association (rather than the test's own first-level cache masking a real N+1), persist via `TestEntityManager`, call `entityManager.clear()` to detach everything, then assert `Hibernate.isInitialized(...)` on the association after calling the repository method.
+
+`integration/SecurityFilterChainIntegrationTest` boots the real `@SpringBootTest(webEnvironment = RANDOM_PORT)` context — unlike `@WebMvcTest`, it does not disable the security filter chain — against the same kind of Testcontainers Postgres, and asserts on the actual filter order (e.g. `X-Request-Id` is present even on a `401`, proving `RequestIdFilter` really does run before authentication is decided). This exists because a wrong relative filter order in `SecurityConfig` previously crashed `bootRun` at startup while every filter's own isolated unit test stayed green — no test-in-isolation can catch a wiring/ordering mistake between filters, only a real end-to-end boot can.
+
+Testcontainers requires a working Docker Engine API connection to run these tests, which is separate from having the `docker` CLI work — on some Windows/Docker Desktop configurations the CLI works (it goes through Docker Desktop's own proxy) while Testcontainers' Java client cannot reach a genuine Engine API endpoint over any of the named pipes. If `./gradlew test` fails these specific classes locally with `Could not find a valid Docker environment`, that's most likely this, not a code problem — CI (`build-and-test` job, GitHub Actions' Linux runners) talks to a real Docker daemon over a Unix socket and isn't affected.
