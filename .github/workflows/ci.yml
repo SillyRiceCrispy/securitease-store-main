@@ -127,17 +127,21 @@ jobs:
   # literally named "prod" - a run on master can never satisfy that policy). Each deploy-* job
   # only re-points that environment's moving tag at the commit SHA image already built and
   # smoke-tested by the `docker` job when this commit was on master - it never rebuilds from
-  # source, and `docker pull` fails loudly if no such image exists (i.e. this commit never went
-  # through the master build+smoke-test pipeline), which is the intended gate: you can only
-  # promote an artifact that already passed CI, never fresh source pushed straight to an
-  # environment branch. The `environment:` key is what applies GitHub's environment protection
-  # rules (required reviewers, branch policy, wait timers) configured once per environment
-  # under Settings -> Environments - see CLAUDE.md for the one-time setup. A real deployment
-  # command (kubectl set image, aws ecs update-service, helm upgrade, ...) would replace the
-  # "retag and push" step once there's an actual target to deploy to; until then this simulates
-  # promotion by moving the environment's tag, which is itself the observable signal of "what's
-  # live in dev/qa/prod right now". Promotion order (dev before qa before prod) is a process
-  # convention, not enforced by the pipeline, since each branch push is an independent run.
+  # source. That image is published by a *different*, separately-triggered workflow run (the
+  # master push), so the "wait for image" step retries the pull for ~5 minutes before giving up
+  # rather than failing on the first miss - promoting shortly after merging to master is exactly
+  # the common case, and master's own build+smoke-test can easily still be in flight. A pull that
+  # never succeeds after retrying means this commit never went through the master pipeline at
+  # all, which is the intended gate: you can only promote an artifact that already passed CI,
+  # never fresh source pushed straight to an environment branch. The `environment:` key is what
+  # applies GitHub's environment protection rules (required reviewers, branch policy, wait
+  # timers) configured once per environment under Settings -> Environments - see CLAUDE.md for
+  # the one-time setup. A real deployment command (kubectl set image, aws ecs update-service,
+  # helm upgrade, ...) would replace the "retag and push" step once there's an actual target to
+  # deploy to; until then this simulates promotion by moving the environment's tag, which is
+  # itself the observable signal of "what's live in dev/qa/prod right now". Promotion order (dev
+  # before qa before prod) is a process convention, not enforced by the pipeline, since each
+  # branch push is an independent run.
   deploy-dev:
     name: Deploy to dev
     needs: build-and-test
@@ -152,10 +156,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Promote this commit's image to dev
+      # This commit's image is published by a *different* workflow run (the master push), so
+      # there's an inherent race between "master finished publishing" and "this run started
+      # pulling" - bounded retry rather than a hard fail on the first miss. Still fails loudly
+      # (after ~5 minutes) if the commit never went through the master pipeline at all.
+      - name: Wait for this commit's image to be published
         run: |
           IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
-          docker pull "$IMAGE:${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          for i in $(seq 1 20); do
+            docker pull "$IMAGE:${{ github.sha }}" && exit 0
+            echo "Image not published yet, retrying in 15s ($i/20)..."
+            sleep 15
+          done
+          echo "$IMAGE:${{ github.sha }} was never published - did this commit go through the master pipeline?"
+          exit 1
+
+      - name: Promote this commit's image to dev
+        run: |
           docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:dev"
           docker push "$IMAGE:dev"
 
@@ -173,10 +191,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Promote this commit's image to qa
+      - name: Wait for this commit's image to be published
         run: |
           IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
-          docker pull "$IMAGE:${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          for i in $(seq 1 20); do
+            docker pull "$IMAGE:${{ github.sha }}" && exit 0
+            echo "Image not published yet, retrying in 15s ($i/20)..."
+            sleep 15
+          done
+          echo "$IMAGE:${{ github.sha }} was never published - did this commit go through the master pipeline?"
+          exit 1
+
+      - name: Promote this commit's image to qa
+        run: |
           docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:qa"
           docker push "$IMAGE:qa"
 
@@ -194,9 +222,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Promote this commit's image to prod
+      - name: Wait for this commit's image to be published
         run: |
           IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
-          docker pull "$IMAGE:${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          for i in $(seq 1 20); do
+            docker pull "$IMAGE:${{ github.sha }}" && exit 0
+            echo "Image not published yet, retrying in 15s ($i/20)..."
+            sleep 15
+          done
+          echo "$IMAGE:${{ github.sha }} was never published - did this commit go through the master pipeline?"
+          exit 1
+
+      - name: Promote this commit's image to prod
+        run: |
           docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:prod"
           docker push "$IMAGE:prod"
