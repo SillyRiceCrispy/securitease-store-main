@@ -121,20 +121,27 @@ jobs:
           docker tag store:${{ github.sha }} "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:${{ github.sha }}"
 
-  # Each deploy-* job promotes the same SHA-pinned image built above by re-pointing that
-  # environment's moving tag at it - it never rebuilds from source. The `environment:` key
-  # is what gates each job on GitHub's environment protection rules (required reviewers,
-  # wait timers, environment-scoped secrets/variables) configured once in the repo's
-  # Settings -> Environments - that repo-admin configuration can't be expressed in this
-  # YAML and isn't something CI should set up on its own, see CLAUDE.md for the one-time
-  # setup steps. A real deployment command (kubectl set image, aws ecs update-service,
-  # helm upgrade, ...) would replace the "retag and push" step once there's an actual
-  # target to deploy to; until then this simulates promotion by moving the environment's
-  # tag, which is itself the observable signal of "what's live in dev/qa/prod right now".
+  # Promotion is branch-triggered, not chained off a single master run: pushing/fast-forwarding
+  # the dev/qa/prod branch to a commit is what promotes it, mirroring how the `prod` environment
+  # is configured in Settings -> Environments (deployment branch policy restricted to a branch
+  # literally named "prod" - a run on master can never satisfy that policy). Each deploy-* job
+  # only re-points that environment's moving tag at the commit SHA image already built and
+  # smoke-tested by the `docker` job when this commit was on master - it never rebuilds from
+  # source, and `docker pull` fails loudly if no such image exists (i.e. this commit never went
+  # through the master build+smoke-test pipeline), which is the intended gate: you can only
+  # promote an artifact that already passed CI, never fresh source pushed straight to an
+  # environment branch. The `environment:` key is what applies GitHub's environment protection
+  # rules (required reviewers, branch policy, wait timers) configured once per environment
+  # under Settings -> Environments - see CLAUDE.md for the one-time setup. A real deployment
+  # command (kubectl set image, aws ecs update-service, helm upgrade, ...) would replace the
+  # "retag and push" step once there's an actual target to deploy to; until then this simulates
+  # promotion by moving the environment's tag, which is itself the observable signal of "what's
+  # live in dev/qa/prod right now". Promotion order (dev before qa before prod) is a process
+  # convention, not enforced by the pipeline, since each branch push is an independent run.
   deploy-dev:
-    name: Promote to dev
-    needs: docker
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    name: Deploy to dev
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     environment: dev
     steps:
@@ -145,7 +152,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Point dev at this build
+      - name: Promote this commit's image to dev
         run: |
           IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
           docker pull "$IMAGE:${{ github.sha }}"
@@ -153,8 +160,9 @@ jobs:
           docker push "$IMAGE:dev"
 
   deploy-qa:
-    name: Promote to qa
-    needs: deploy-dev
+    name: Deploy to qa
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/qa'
     runs-on: ubuntu-latest
     environment: qa
     steps:
@@ -165,7 +173,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Point qa at this build
+      - name: Promote this commit's image to qa
         run: |
           IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
           docker pull "$IMAGE:${{ github.sha }}"
@@ -173,8 +181,9 @@ jobs:
           docker push "$IMAGE:qa"
 
   deploy-prod:
-    name: Promote to prod
-    needs: deploy-qa
+    name: Deploy to prod
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/prod'
     runs-on: ubuntu-latest
     environment: prod
     steps:
@@ -185,7 +194,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Point prod at this build
+      - name: Promote this commit's image to prod
         run: |
           IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
           docker pull "$IMAGE:${{ github.sha }}"
