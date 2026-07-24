@@ -110,11 +110,84 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Tagged only by immutable commit SHA - deliberately no "latest". The environments
+      # below promote *this exact artifact* through dev -> qa -> prod rather than each
+      # re-building from source, so what was smoke-tested above is byte-for-byte what ships.
       - name: Tag and push image
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
         run: |
-          IMAGE=ghcr.io/${{ github.repository_owner }}/store
-          docker tag store:${{ github.sha }} "$(echo $IMAGE | tr '[:upper:]' '[:lower:]'):${{ github.sha }}"
-          docker tag store:${{ github.sha }} "$(echo $IMAGE | tr '[:upper:]' '[:lower:]'):latest"
-          docker push "$(echo $IMAGE | tr '[:upper:]' '[:lower:]'):${{ github.sha }}"
-          docker push "$(echo $IMAGE | tr '[:upper:]' '[:lower:]'):latest"
+          IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker tag store:${{ github.sha }} "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:${{ github.sha }}"
+
+  # Each deploy-* job promotes the same SHA-pinned image built above by re-pointing that
+  # environment's moving tag at it - it never rebuilds from source. The `environment:` key
+  # is what gates each job on GitHub's environment protection rules (required reviewers,
+  # wait timers, environment-scoped secrets/variables) configured once in the repo's
+  # Settings -> Environments - that repo-admin configuration can't be expressed in this
+  # YAML and isn't something CI should set up on its own, see CLAUDE.md for the one-time
+  # setup steps. A real deployment command (kubectl set image, aws ecs update-service,
+  # helm upgrade, ...) would replace the "retag and push" step once there's an actual
+  # target to deploy to; until then this simulates promotion by moving the environment's
+  # tag, which is itself the observable signal of "what's live in dev/qa/prod right now".
+  deploy-dev:
+    name: Promote to dev
+    needs: docker
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Point dev at this build
+        run: |
+          IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
+          docker pull "$IMAGE:${{ github.sha }}"
+          docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:dev"
+          docker push "$IMAGE:dev"
+
+  deploy-qa:
+    name: Promote to qa
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: qa
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Point qa at this build
+        run: |
+          IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
+          docker pull "$IMAGE:${{ github.sha }}"
+          docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:qa"
+          docker push "$IMAGE:qa"
+
+  deploy-prod:
+    name: Promote to prod
+    needs: deploy-qa
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Point prod at this build
+        run: |
+          IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/store" | tr '[:upper:]' '[:lower:]')
+          docker pull "$IMAGE:${{ github.sha }}"
+          docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:prod"
+          docker push "$IMAGE:prod"

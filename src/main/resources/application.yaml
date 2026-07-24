@@ -55,6 +55,12 @@ app:
     # Local-dev-only default. Override via the API_KEY env var in any other environment.
     api-key: ${API_KEY:local-dev-only-change-me}
 
+# Surfaced at /actuator/info (via management.info.env.enabled below) so a curl against a
+# running instance immediately shows which environment it is. Set via APP_ENVIRONMENT in
+# each environment's deploy config (see CLAUDE.md) - defaults to "local" for bootRun/tests.
+info:
+  environment: ${APP_ENVIRONMENT:local}
+
 logging:
   pattern:
     # Include the correlation id (RequestIdFilter) in the plain-text local dev console too -
